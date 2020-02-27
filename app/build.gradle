@@ -1,0 +1,193 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
+
+apply plugin: 'com.google.gms.google-services'
+
+android {
+    compileSdkVersion 29
+    buildToolsVersion "29.0.2"
+
+    signingConfigs {
+
+        firebase {
+            def properties = getSigningProperties('firebase.signing.properties')
+            keyAlias properties['keyAlias']
+            keyPassword properties['keyPassword']
+            storeFile file(properties['storeFile'])
+            storePassword properties['storePassword']
+        }
+
+    }
+
+    defaultConfig {
+        applicationId "com.max.hackernews"
+        minSdkVersion 21
+        targetSdkVersion 29
+        versionCode readVersionCode()
+        versionName readVersionName()
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    flavorDimensions "server"
+
+    productFlavors {
+        development {
+            dimension "server"
+            applicationIdSuffix ".development"
+            versionNameSuffix "-development"
+        }
+
+        production {
+            dimension "server"
+        }
+    }
+
+    buildTypes {
+
+        debug {
+            applicationIdSuffix ".debug"
+            debuggable true
+        }
+
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+            productFlavors.development.signingConfig signingConfigs.firebase
+        }
+
+    }
+
+
+
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'androidx.appcompat:appcompat:1.0.2'
+    implementation 'androidx.core:core-ktx:1.0.2'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.1'
+
+    implementation 'com.google.firebase:firebase-analytics:17.2.2'
+}
+
+def getSigningProperties(def filepath) {
+    if (!filepath) {
+        throw new GradleException("Signing properties filepath cannot be empty.")
+    }
+    def keystorePropertiesFile = project.file(filepath)
+    def keystoreProperties = new Properties()
+    def stream
+    try {
+        stream = new FileInputStream(keystorePropertiesFile)
+        keystoreProperties.load(stream)
+    } catch(FileNotFoundException ignore) {
+        throw new GradleException("Signing properties file not found.")
+    }
+    assert keystoreProperties['keyAlias'] != null
+    assert keystoreProperties['keyPassword'] != null
+    assert keystoreProperties['storeFile'] != null
+    assert keystoreProperties['storePassword'] != null
+
+    return keystoreProperties
+}
+
+def readVersion() {
+    def versionFile = new File(project.rootDir, 'version.properties')
+    def version = new Properties()
+    def stream
+    try {
+        stream = new FileInputStream(versionFile)
+        version.load(stream)
+    } catch (FileNotFoundException ignore) {
+    } finally {
+        if (stream != null) stream.close()
+    }
+    if (!version['major']) version['major'] = "1"
+    if (!version['minor']) version['minor'] = "0"
+    if (!version['patch']) version['patch'] = "0"
+    if (!version['build']) version['build'] = "1"
+    return version
+}
+
+def readVersionName() {
+    def version = readVersion()
+    return "${version['major']}.${version['minor']}.${version['patch']}"
+}
+
+def readVersionCode() {
+    def version = readVersion()
+    def code = version['build'] as int
+    return code
+}
+
+def incrementVersionNumber(def type = "build") {
+    def versionFile = new File(project.rootDir, 'version.properties')
+
+    def version = readVersion()
+
+    def major = version['major'] as int
+    def minor = version['minor'] as int
+    def fix = version['patch'] as int
+    def build = version['build'] as int
+
+    if (type == 'major') {
+        major++
+        minor = 0
+        fix = 0
+    } else if (type == 'minor') {
+        minor++
+        fix = 0
+    }else if (type == 'patch') {
+        fix++
+    }
+
+    build++
+
+    version['major'] = major.toString()
+    version['minor'] = minor.toString()
+    version['patch'] = fix.toString()
+    version['build'] = build.toString()
+
+    def stream = new FileOutputStream(versionFile)
+    try {
+        version.store(stream, null)
+    } finally {
+        stream.close()
+    }
+
+    return major + "." + minor
+}
+
+task doMajorVersionIncrement {
+    doLast {
+        println "Incrementing major version..."
+        incrementVersionNumber('major')
+    }
+}
+
+task doMinorVersionIncrement {
+    doLast {
+        println "Incrementing minor version..."
+        incrementVersionNumber('minor')
+    }
+}
+
+task doPatchVersionIncrement {
+    doLast {
+        println "Incrementing fix version..."
+        incrementVersionNumber('patch')
+    }
+}
+
+task doBuildNumberIncrement {
+    doLast {
+        println "Incrementing build number..."
+        incrementVersionNumber('build')
+    }
+}
